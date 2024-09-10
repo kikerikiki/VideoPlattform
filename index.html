@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible=IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Upload</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            height: 100vh;
+            background: linear-gradient(135deg, #3060DD, #00020e); 
+            color: #f0f0f0;
+            overflow: hidden;
+        }
+        .sidebar {
+            width: 30%;
+            padding: 20px;
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(37, 37, 54, 0.8);
+            backdrop-filter: blur(10px);
+            box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+            overflow-y: auto;
+            border-radius: 15px 0 0 15px;
+        }
+        .sidebar h2 {
+            color: #60AAFF;
+            font-weight: 600;
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
+        }
+        .content {
+            width: 70%;
+            padding: 20px;
+            background: rgba(44, 44, 59, 0.7);
+            backdrop-filter: blur(10px);
+            position: relative;
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.3);
+            border-radius: 0 15px 15px 0;
+        }
+        .content.dragover {
+            border: 2px dashed #60AAFF;
+            background-color: rgba(53, 53, 74, 0.8);
+        }
+        .empty-message {
+            text-align: center;
+            color: #8080FF; 
+            margin-top: 50px;
+            font-size: 18px;
+        }
+        .treeview {
+            list-style: none;
+            padding-left: 20px;
+        }
+        .treeview li {
+            position: relative;
+            margin: 5px 0;
+            cursor: pointer;
+            user-select: none;
+        }
+        .folder {
+            display: flex;
+            align-items: center;
+            padding: 8px 10px;
+            border-radius: 10px;
+            transition: background-color 0.3s, transform 0.2s;
+            color: #f0f0f0;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        .folder:hover {
+            background-color: rgba(96, 170, 255, 0.2); 
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(96, 170, 255, 0.3);
+        }
+        .folder.selected {
+            background-color: #4080FF; 
+            color: white;
+        }
+        .folder-icon {
+            margin-right: 8px;
+            font-size: 18px;
+        }
+        .toggle {
+            margin-right: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            user-select: none;
+        }
+        .toggle::before {
+            content: '+';
+            color: #60AAFF; 
+        }
+        .expanded > .toggle::before {
+            content: '-';
+        }
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+        .video-item, .folder-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 15px;
+            background: rgba(60, 60, 82, 0.6);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s, box-shadow 0.2s, background-color 0.3s;
+        }
+        .video-item:hover, .folder-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(96, 170, 255, 0.3);
+            background-color: rgba(69, 69, 92, 0.8);
+        }
+        .video-name, .folder-name {
+            margin-top: 10px;
+            text-align: center;
+            font-size: 14px;
+            color: #f0f0f0;
+            word-wrap: break-word;
+        }
+        .folder-thumbnail {
+            font-size: 70px;
+            color: #8080FF; 
+        }
+        button, input[type="file"], input[type="text"] {
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 10px 15px;
+            margin-top: 10px;
+            font-size: 14px;
+            outline: none;
+            background-color: rgba(53, 53, 74, 0.8);
+            color: #f0f0f0;
+            transition: border-color 0.3s, box-shadow 0.3s, background-color 0.3s;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        button {
+            background-color: #4080FF; 
+            color: white;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        button:hover {
+            background-color: #3060DD; 
+            box-shadow: 0 6px 12px rgba(48, 96, 221, 0.4);
+        }
+        input[type="text"]:focus, input[type="file"]:focus {
+            border-color: #60AAFF;
+            box-shadow: 0 0 5px rgba(96, 170, 255, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar" onclick="removeFocusFromFolder(event)">
+        <h2>Ordnerstruktur</h2>
+        <input type="text" id="folderInput" placeholder="Ordnernamen eingeben">
+        <button onclick="createFolder()">Ordner hinzufügen</button>
+        <button onclick="clearDatabase()">Datenbank leeren</button>
+        <ul id="folderList" class="treeview"></ul>
+    </div>
+
+    <div class="content" id="contentArea">
+        <h2>Inhalt des ausgewählten Ordners</h2>
+        <input type="file" id="videoInput" accept="video/mp4">
+        <button onclick="uploadVideo()">Upload Video</button>
+        <div id="contentList" class="video-grid"></div>
+    </div>
+
+    <script>
+        let db;
+        let selectedFolderId = null;
+        let selectedFolderElement = null;
+
+        //db zeugs 
+        const request = indexedDB.open("VideoDatabase", 4);
+
+        request.onupgradeneeded = (event) => {
+            db = event.target.result;
+            if (!db.objectStoreNames.contains("folders")) {
+                const folderStore = db.createObjectStore("folders", { keyPath: "id", autoIncrement: true });
+                folderStore.createIndex("name", "name", { unique: false });
+                folderStore.createIndex("parentId", "parentId", { unique: false });
+            }
+            if (!db.objectStoreNames.contains("videos")) {
+                const videoStore = db.createObjectStore("videos", { keyPath: "id", autoIncrement: true });
+                videoStore.createIndex("folderId", "folderId", { unique: false });
+            }
+        };
+
+        request.onsuccess = (event) => {
+            db = event.target.result;
+            loadFolders();
+        };
+
+        request.onerror = (event) => {
+            console.error("Database error:", event.target.errorCode);
+        };
+
+        function createFolder() {
+            const folderName = document.getElementById('folderInput').value.trim();
+            if (!folderName) {
+                alert('Bitte einen Ordnernamen eingeben.');
+                return;
+            }
+
+            const transaction = db.transaction(["folders"], "readwrite");
+            const folderStore = transaction.objectStore("folders");
+            folderStore.add({ name: folderName, parentId: selectedFolderId || null });
+
+            transaction.oncomplete = () => {
+                document.getElementById('folderInput').value = '';
+                if (selectedFolderId) {
+                    const parentElement = selectedFolderElement.querySelector('.treeview');
+                    parentElement.innerHTML = '';
+                    loadSubfolders(selectedFolderId, parentElement);
+                    selectedFolderElement.classList.add('expanded');
+                } else {
+                    loadFolders();
+                }
+            };
+
+            transaction.onerror = (event) => {
+                console.error("Fehler beim Hinzufügen des Ordners:", event.target.errorCode);
+            };
+        }
+
+        function loadFolders() {
+            const folderList = document.getElementById('folderList');
+            folderList.innerHTML = '';
+
+            const transaction = db.transaction(["folders"], "readonly");
+            const folderStore = transaction.objectStore("folders");
+
+            const rootFolders = [];
+            folderStore.openCursor().onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    const folder = cursor.value;
+                    if (!folder.parentId) {
+                        rootFolders.push(folder);
+                    }
+                    cursor.continue();
+                } else {
+                    renderFolders(rootFolders, folderList);
+                }
+            };
+        }
+
+        function renderFolders(folders, parentElement) {
+            folders.forEach(folder => {
+                const li = document.createElement('li');
+                const folderElement = document.createElement('div');
+                folderElement.className = 'folder';
+                folderElement.dataset.folderId = folder.id;
+
+                const toggle = document.createElement('span');
+                toggle.className = 'toggle';
+
+                const icon = document.createElement('span');
+                icon.className = 'folder-icon';
+                icon.innerHTML = '📁';
+
+                const name = document.createElement('span');
+                name.className = 'folder-name';
+                name.textContent = folder.name;
+
+                folderElement.appendChild(toggle);
+                folderElement.appendChild(icon);
+                folderElement.appendChild(name);
+                li.appendChild(folderElement);
+                parentElement.appendChild(li);
+
+                folderElement.onclick = (e) => {
+                    e.stopPropagation();
+                    selectFolder(folder.id, folderElement);
+                    toggleSubfolders(folderElement, li, folder.id);
+                };
+
+                folderElement.addEventListener('dragover', (event) => {
+                    event.preventDefault();
+                    folderElement.classList.add('dragover');
+                });
+
+                folderElement.addEventListener('dragleave', () => {
+                    folderElement.classList.remove('dragover');
+                });
+
+                folderElement.addEventListener('drop', (event) => {
+                    event.preventDefault();
+                    folderElement.classList.remove('dragover');
+
+                    const files = Array.from(event.dataTransfer.files);
+                    const videoFiles = files.filter(file => file.type === 'video/mp4');
+
+                    videoFiles.forEach(file => saveVideo(file, folder.id));
+                });
+
+                const subfolderContainer = document.createElement('ul');
+                subfolderContainer.className = 'treeview';
+                li.appendChild(subfolderContainer);
+            });
+        }
+
+        function toggleSubfolders(folderElement, li, folderId) {
+            const subfolderContainer = li.querySelector('.treeview');
+            if (!folderElement.classList.contains('expanded')) {
+                loadSubfolders(folderId, subfolderContainer);
+                folderElement.classList.add('expanded');
+            } else {
+                subfolderContainer.innerHTML = '';
+                folderElement.classList.remove('expanded');
+            }
+        }
+
+        function loadSubfolders(parentId, parentElement) {
+            const transaction = db.transaction(["folders"], "readonly");
+            const folderStore = transaction.objectStore("folders");
+            const index = folderStore.index("parentId");
+            const query = index.openCursor(IDBKeyRange.only(parentId));
+
+            query.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    const folder = cursor.value;
+                    renderFolders([folder], parentElement);
+                    cursor.continue();
+                }
+            };
+        }
+
+        function removeFocusFromFolder(event) {
+            if (event.target === document.querySelector('.sidebar')) {
+                if (selectedFolderElement) {
+                    selectedFolderElement.classList.remove('selected');
+                    selectedFolderElement = null;
+                    selectedFolderId = null;
+                }
+            }
+        }
+
+        function selectFolder(folderId, folderElement) {
+            selectedFolderId = folderId;
+
+            if (selectedFolderElement) {
+                selectedFolderElement.classList.remove('selected');
+            }
+
+            folderElement.classList.add('selected');
+            selectedFolderElement = folderElement;
+
+            loadContent(folderId);
+        }
+
+        function loadContent(folderId) {
+            const contentList = document.getElementById('contentList');
+            contentList.innerHTML = '';
+            let isEmpty = true;
+
+            const transactionFolders = db.transaction(["folders"], "readonly");
+            const folderStore = transactionFolders.objectStore("folders");
+            const indexFolders = folderStore.index("parentId");
+            const queryFolders = indexFolders.openCursor(IDBKeyRange.only(folderId));
+
+            queryFolders.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    isEmpty = false;
+                    const folder = cursor.value;
+                    const folderElement = document.createElement('div');
+                    folderElement.className = 'folder-item';
+
+                    const folderIcon = document.createElement('div');
+                    folderIcon.className = 'folder-thumbnail';
+                    folderIcon.innerHTML = '📁'; 
+
+                    const folderName = document.createElement('p');
+                    folderName.className = 'folder-name';
+                    folderName.textContent = folder.name;
+
+                    folderElement.appendChild(folderIcon);
+                    folderElement.appendChild(folderName);
+                    folderElement.onclick = () => selectFolder(folder.id, folderElement);
+
+                    contentList.appendChild(folderElement);
+                    cursor.continue();
+                }
+            };
+
+            const transactionVideos = db.transaction(["videos"], "readonly");
+            const videoStore = transactionVideos.objectStore("videos");
+            const indexVideos = videoStore.index("folderId");
+            const queryVideos = indexVideos.openCursor(IDBKeyRange.only(folderId));
+
+            queryVideos.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    isEmpty = false;
+                    const video = cursor.value;
+                    const videoElement = document.createElement('div');
+                    videoElement.className = 'video-item';
+
+                    const videoPlayer = document.createElement('video');
+                    videoPlayer.src = URL.createObjectURL(new Blob([video.data], { type: 'video/mp4' }));
+                    videoPlayer.controls = true;
+                    videoPlayer.width = 200;
+
+                    const formattedName = video.name.replace(/\.mp4$/i, '');
+                    const info = document.createElement('p');
+                    info.className = 'video-name';
+                    info.textContent = formattedName;
+
+                    videoElement.appendChild(videoPlayer);
+                    videoElement.appendChild(info);
+
+                    contentList.appendChild(videoElement);
+                    cursor.continue();
+                }
+            };
+
+            transactionVideos.oncomplete = () => {
+                if (isEmpty) {
+                    const emptyMessage = document.createElement('p');
+                    emptyMessage.className = 'empty-message';
+                    emptyMessage.textContent = 'Dieser Ordner ist leer';
+                    contentList.appendChild(emptyMessage);
+                }
+            };
+        }
+
+        function uploadVideo() {
+            if (!selectedFolderId) {
+                alert('Bitte zuerst einen Ordner auswählen.');
+                return;
+            }
+
+            const input = document.getElementById('videoInput');
+            const file = input.files[0];
+
+            if (!file || file.type !== 'video/mp4') {
+                alert('Bitte ein gültiges MP4-Video hochladen.');
+                return;
+            }
+
+            saveVideo(file, selectedFolderId);
+        }
+
+        function saveVideo(file, folderId) {
+            const reader = new FileReader();
+            reader.onload = function (event) {
+                const videoData = event.target.result;
+
+                const transaction = db.transaction(["videos"], "readwrite");
+                const videoStore = transaction.objectStore("videos");
+                videoStore.add({ name: file.name, data: videoData, folderId: folderId });
+
+                transaction.oncomplete = () => {
+                    alert('Video erfolgreich hochgeladen!');
+                    loadContent(folderId);
+                };
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+
+        const contentArea = document.getElementById('contentArea');
+
+        contentArea.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            contentArea.classList.add('dragover');
+        });
+
+        contentArea.addEventListener('dragleave', () => {
+            contentArea.classList.remove('dragover');
+        });
+
+        contentArea.addEventListener('drop', (event) => {
+            event.preventDefault();
+            contentArea.classList.remove('dragover');
+
+            const files = Array.from(event.dataTransfer.files);
+            const videoFiles = files.filter(file => file.type === 'video/mp4');
+
+            if (!selectedFolderId) {
+                alert('Bitte zuerst einen Ordner auswählen.');
+                return;
+            }
+
+            videoFiles.forEach(file => saveVideo(file, selectedFolderId));
+        });
+
+        function clearDatabase() {
+            const transaction = db.transaction(["folders", "videos"], "readwrite");
+
+            const folderStore = transaction.objectStore("folders");
+            folderStore.clear();
+
+            const videoStore = transaction.objectStore("videos");
+            videoStore.clear();
+
+            transaction.oncomplete = () => {
+                alert('Alle Daten wurden erfolgreich gelöscht!');
+                loadFolders();
+                document.getElementById('contentList').innerHTML = ''; 
+            };
+
+            transaction.onerror = (event) => {
+                console.error("Fehler beim Löschen der Daten:", event.target.errorCode);
+            };
+        }
+    </script>
+</body>
+</html>
